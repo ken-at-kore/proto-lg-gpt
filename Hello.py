@@ -14,37 +14,56 @@
 
 import streamlit as st
 from streamlit.logger import get_logger
+import openai
+from Contants import SYSTEM_PROMPT
 
 LOGGER = get_logger(__name__)
 
 
 def run():
-    st.set_page_config(
-        page_title="Hello",
-        page_icon="👋",
-    )
+  st.set_page_config(
+      page_title="LG-GPT Prototype",
+      page_icon="🤖",
+  )
 
-    st.write("# :balloon: Welcome to Ken's Streamlit app! 👋")
+  st.title("LG-GPT Prototype")
 
-    st.sidebar.success("Select a demo above.")
+  openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-    st.markdown(
-        """
-        Streamlit is an open-source app framework built specifically for
-        Machine Learning and Data Science projects.
-        **👈 Select a demo from the sidebar** to see some examples
-        of what Streamlit can do!
-        ### Want to learn more?
-        - Check out [streamlit.io](https://streamlit.io)
-        - Jump into our [documentation](https://docs.streamlit.io)
-        - Ask a question in our [community
-          forums](https://discuss.streamlit.io)
-        ### See more complex demos
-        - Use a neural net to [analyze the Udacity Self-driving Car Image
-          Dataset](https://github.com/streamlit/demo-self-driving)
-        - Explore a [New York City rideshare dataset](https://github.com/streamlit/demo-uber-nyc-pickups)
-    """
-    )
+  if "openai_model" not in st.session_state:
+      st.session_state["openai_model"] = "gpt-4"
+
+  if "messages" not in st.session_state:
+      st.session_state.messages = [
+          {"role": "system", "content": SYSTEM_PROMPT},
+          {"role": "assistant", "content": "How can I help you?"}
+        ]
+
+  for message in st.session_state.messages:
+      if message["role"] == "user" or message["role"] == "assistant":
+        with st.chat_message(message["role"]):
+              st.markdown(message["content"])
+
+  if prompt := st.chat_input("What's up?"):
+      st.session_state.messages.append({"role": "user", "content": prompt})
+      with st.chat_message("user"):
+          st.markdown(prompt)
+
+      with st.chat_message("assistant"):
+          message_placeholder = st.empty()
+          full_response = ""
+          for response in openai.ChatCompletion.create(
+              model=st.session_state["openai_model"],
+              messages=[
+                  {"role": m["role"], "content": m["content"]}
+                  for m in st.session_state.messages
+              ],
+              stream=True,
+          ):
+              full_response += response.choices[0].delta.get("content", "")
+              message_placeholder.markdown(full_response + "▌")
+          message_placeholder.markdown(full_response)
+      st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 
 if __name__ == "__main__":
